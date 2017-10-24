@@ -1,0 +1,117 @@
+1.	INTRODUCTION
+1.1	Document History
+
+Vers No. Date Modification 
+1.0 3-4-93 Created 
+1.1 4-26-93 Modified error handling to separate file.
+1.2 5-27-93 Modified functionality for latest version.
+2.0 3-21-96 Rewrite for latest SSL version
+3.0 8-10-97 Fast option functionality
+5.0 6-10-98 Wildcard Functionality  
+
+1.2	Capabilities
+
+The SSL Field Retrieval Engine (sslfre) is a Triarch based SSL application which retrieves and processes data fields from record based Triarch source services.
+
+1.3	Definitions, Acronyms, and Abbreviations
+
+SSL - Source-Sink Library API for the Triarch network
+RIC - Reuter Instrument Code (The item identifier on the Reuter IDN network)
+FID - Field Identifier (Identifies a field contained in MarketFeed record data)
+Triarch - The Reuter network based Trading Information Architecture
+IDN - The Reuter Integrated Data Network
+SelectFeed - The name of the datafeed interface to the Reuter IDN data network
+MarketFeed - The Protocol used to access data from the IDN network
+
+1.4	Reference Documents
+
+[1] Reuter SSL User Manual, Version 3.0.1  [2] Reuter SSL Reference Manual Version 4.0  [3] Reuter SSL Developer Guide Version 4.0  [4] Reuter SelectFeed User Guide, May 1992  [5] Reuter Data Book, Version 9.41, May 1992  [6] Triarch Programming Guide, Volume I - Concept  
+
+2.	FUNCTIONALITY
+
+2.1	Initialization and Shutdown
+
+The program is invoked either manually or by some periodic utility (e.g. cron). It will process whatever input is supplied, write output and exit to the invocation environment. At its simplest level, the program acts as a filter program, reading from the standard input data stream and writing the results and errors to the standard output and standard error data streams.
+The input file provides a list of Triarch source service names, item identifiers and record field identifiers. The normal output stream will contain field data from the specified source server and item identifier. The item identifier may be the name of a chain record or any specific market instrument available from the specified Triarch source service.
+
+2.1.1	Command line options
+
+An input and output filename may be specified, or the standard input and/or standard output may be used. Input files, output files, error files, bad symbol files, and log files may all be created through various start-up command line options.
+If only one file is specified on the command line, it is read as the input file if no files are specified using the -i <input file> option. If two files are specified, the first is used as the input file as detailed, and the other is used as the output file if no files are specified using the -o <output file> option. If no files are specified and the -i option is not used, then the standard input data stream is read. If no files are specified and the -o option is not used, then the standard output data stream is written. If the -e <bad record file> option is not specified, the bad symbols will be written to standard error. If the -b <error file> option is not specified, the program errors will be written to the standard error.
+
+If the -l <log file> option is specified, then logging will take place if the file can be opened. Otherwise, no logging will be performed. Logging is mainly used for debugging if expected results are not achieved. Additional specification of the verbose flag (-v) will add additional levels of logging to a painfully verbose level. If the -v flag is specified without the logfile specification, standard output will be used.
+Other valid options include writing all available field data using the all-available fields (-a) option. This will output all fields returned by the Triarch record source service regardless of any field specifications on each line of input.
+Specifying the -d option can use an optional specification of output delimiters. This allows either one or two delimiters to be used instead of the open and closed parentheses. One character delimiter will specify a delimiter to be used at the start and stopping of a field, and two delimiters will use the first character to start a data field and the second character to end a data field. This option allows the user to use various parsing methods to be used on the output data. Note that if control characters or other special characters are used, they must be properly escaped from the invocation shell if they would be interpreted by the shell. Also note that the delimiters only separate the field data from the field identifiers.
+A field-formatting file may be specified using the -f option. This allows individual field specification of output format precision. This may allow the program to output fixed format results.
+An option that can use used with formatting is the -N option. This option will cause the program to fill null or missing data with the width specified in the field-formatting file described above.
+Another option that can effect formatting is the -c option. A precision may be specified which will apply that precision to all detected price fields. The price fields may be determined by the use of the IDN appendix_a or field.defs file as determined by the environmental variable FIELD_DB_DIR, or may exist in the current directory. If this file is not found, the program tries to determine whether a price exits by examining the data. The success under these circumstances cannot be guaranteed, so in general, this option is not recommended.
+Normally the program executes a line at a time from the input file. Much can be gained, especially when link are not used, by specifying the fast request option -F, which keeps a fixed number of requests outstanding. Normally, the number of outstanding is about 100 requests, but if network slowdowns are detected, the program steps down the level.
+A Triarch Sink Server name can be specified using the -S option. This is the name which is mapped in the Triarch ipcroute file (normally kept in /var/triarch).
+
+2.1.2	DACS Sink Level Permissioning
+
+The program attempts to mount the sink distributor using the application id, which is hard coded to 260 and is required by the DACS administrator for proper configuration. A work around for systems that require a different DACS application id is to define the environmental variable ÒTRIARCH_USER_NAMEÓ, which will override the entire DACS user name field when attempting to mount the SSL Sink Distributor. The logfile will display the Triarch user name for debugging purposes when activated.
+
+2.2	Data
+
+The input data will consist of a list of Triarch source service names, item identifiers, followed by a comma-separated list of field identifiers (FIDÕs). The maximum length of an input line is 255 characters. Any line longer than 255 characters will be rejected and the next line of data will be read. Newline characters separate each line in the file. The source names and item identifiers and field identifiers are separated with white space (i.e. spaces and tabs). There must be no spaces between the comma-separated list of field identifiers.
+The output data consists of the same Triarch source service names, the item identifiers, and each field identifier retrieved with the corresponding data. The data will be enclosed between parenthesis by default, but can be modified by the -d option to provide one or two replacement delimiters. If any errors occur for a particular request, then a negative value will be inserted into the error file instead of the normal output file. This negative value will be followed with text possibly describing the error in more depth.
+Each single request from the input file will have a corresponding output in the normal output file, the error file, or the bad symbol file. In the case of chain requests (where one request cause multiple items to be called), the ordering of items may not correspond to the order in which the requests were made. Additionally, when the fast request mode is enabled, items may not be output in the same order as the input.
+
+2.3	System Inputs
+
+The following format is used for the input file:
+<source name> <item identifier> 1{<field identifier>}n
+The source name is a SSL source service name that is used to access the particular Triarch source service. If this service does not exist or is not a record service, then a negative value will be placed in the bad symbol output file after the source name and item identifier. If this service is not currently active due to a communications problem, a negative value will be placed in the error output file.
+Two special cases have been added for convenience to allow all fields for a particular item to be written. First the user may specify the -a option on the program command line when starting the program from a shell. This causes all subsequent requests to ignore the specified fields identifiers (if any), and write all data fields received from that item. The second special case is to specify ALL instead of any field identifiers. In this case only this particular input line will display all fields.
+Except for the two special cases listed in the previous paragraph all items must contain at least one field identifier specified in a comma separated list. Refer to the Reuter Data Book [3] for explanation of field identifiers.
+Some examples are as follows:
+IDN_SELECTFEED IBM.N 3,4,6,19
+This line calls the item identifier IBM.N (IBM on NYSE) from the IDN SelectFeed Server and will retrieve the fields 3 (Display Name), 4 (Exchange), 6 (Trade Price), 19 (Opening Price), and 21 (Previous Close).
+IDN_SELECTFEED 0#CL: 3,4,5,6
+This line calls the item identifier 0#CL: (WTI Light Crude Oil) from the IDN SelectFeed Server. This RIC is a chain record which contains links to other RICs and will retrieve the fields 3 (Display Name), 4 (Exchange), 6 (Trade Price) from the RICs that are members of the link fields.
+IDN_SELECTFEED DEM= ALL
+This line calls the item identifier DEM= (German Mark Spot Rate) from the IDN SelectFeed Server. All fields returned by the SelectFeed will be written.
+
+2.4	System Processing
+
+2.4.1	Normal Operation
+
+This program will read the supplied file and will process one line at a time. Comment lines will start with a #. Blank lines will also be ignored. The normal output will default to the standard output data stream unless a filename is specified with the -o option. The error output will default to the standard error data stream unless a filename is specified with the -b option. The bad symbol output will default to the standard error data stream unless a filename is specified with the -e option
+If the item identifier is a chain record (i.e. a record which links multiple records), then this record contains links to other items as well as additional chain records. This program will retrieve and write the data from the link records and not from the chain record directly. The program will continue to call link records until no links remain. Each item called from the chain record will produce one line of output either on the normal data stream or on the error data stream. Every successful request will produce at least one line of output.
+If the item identifier is invalid or cannot be accessed, then the bad symbol output will contain a negative value after the name of the source service and item identifier followed by a status message describing the problem.
+If a particular field does not exist in the record, the field will be skipped, and no data from that field will appear in the output file unless overridden with the -N option. If no fields are processed, a negative value will be placed after the name of source service and item identifier in the error output file followed by a status message describing the problem.
+
+2.4.2	Error Handling
+
+If a error occurs while using the SSL function calls, the program will print a message to the error file and process the next request. If no requests can be satisfied due to a complete SSL failure (such as the network down), the program will print a message to the error output file, exit, and return an error value to the invocation environment. The choice to exit the program has been made because this program is a one shot program (i.e., it process a given input and then exits).
+The logfile may provide greater detail of the actual error and is not written by default.
+Each valid input line will produce output unless a fatal error occurs.
+The following table describes the possible error codes which can occur in the error file:
+Table 1: Error Codes   Error Value Comment  -1 Invalid item name or item does not exist  -2 Invalid source name or source does not exist  -3 Access has been denied to network or to a particular item  -4 No specified field identifiers are specified or accessible from the data  -5 There is a communications problem with the specified source  -6 Invalid input line format  -7 Invalid field identifier specified (e.g. non-numeric or negative characters)  -8 The network is unavailable, the distributor is down or unreachable  -9 Unspecified error - check text for explanation  -10 Out of memory or resources  -11 Specified source is not a Triarch record based source service  2.5	Normal Outputs
+The normal program output will default to the standard output data stream, but can be saved to a file using the -o option or standard output redirection.
+The normal output format is as follows:
+<source name> <item identifier> 0{<field identifier>(<field data>)}n
+The example for IBM.N from the IDN_SELECTFEED source shown above would yield the following:
+IDN_SELECTFEED IBM.N 3(INTL BUS MACHINE) 4(NYS) 6(55 7/8) 19(56 7/8)
+The example for 0#CL: shown above would yield the following (Only 2 are shown):
+IDN_SELECTFEED CLJ3 3(LIGHT CRUDE Apr3) 4(NYM) 5(16:15) 6(+20.18)
+IDN_SELECTFEED CLK3 3(LIGHT CRUDE May3) 4(NYM) 5(16:15) 6(+20.28)
+...
+
+2.6	Error Outputs
+
+The error program output will default to the standard error data stream, but can be saved to a file using the -b option or standard error redirection.
+The error output format is as follows:
+<source name> <item identifier> <error code> [<text>]
+
+2.7	Bad Symbol Outputs
+
+The bad symbol program output will default to the standard error data stream, but can be saved to a file using the -e option or standard error redirection.
+The error output format is as follows:
+<source name> <item identifier> <error code> [<text>]
+The example for IBM.NOT would yield the following:
+IDN_SELECTFEED IBM.NOT -1 ISFS: INVALID NAME
+SSL Field Retrieval Engine, Release 1.0		Page
+
+Functional Specification, Version 1.1
